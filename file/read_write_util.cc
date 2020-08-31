@@ -22,6 +22,20 @@ IOStatus NewWritableFile(FileSystem* fs, const std::string& fname,
   return s;
 }
 
+IOStatus NewWritableLeveledFile(Env* env,
+		       const std::string& fname,
+                       std::unique_ptr<FSWritableFile>* result,
+                       const FileOptions& options, int level) {
+
+    Status s = env->NewWritableLeveledFile(fname,
+	  reinterpret_cast<std::unique_ptr<rocksdb::WritableFile> *>(result),
+	  options, level);
+
+  TEST_KILL_RANDOM("NewWritableLeveledFile:0", rocksdb_kill_odds * REDUCE_ODDS2);
+
+  return *(reinterpret_cast<IOStatus *>(&s));
+}
+
 bool ReadOneLine(std::istringstream* iss, FSSequentialFile* seq_file,
                  std::string* output, bool* has_data, Status* result) {
   const int kBufferSize = 8192;

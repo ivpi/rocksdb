@@ -140,6 +140,9 @@ class Env {
     uint64_t size_bytes;
   };
 
+  // Use writable leveled file
+  bool writable_file_leveled = false;
+
   Env() : thread_status_updater_(nullptr) {}
   // No copying allowed
   Env(const Env&) = delete;
@@ -204,6 +207,20 @@ class Env {
   virtual Status NewWritableFile(const std::string& fname,
                                  std::unique_ptr<WritableFile>* result,
                                  const EnvOptions& options) = 0;
+
+  // The same as NewWritableFile, but creates a file linked to a specific level.
+  // The implementation of this method is optional.
+  virtual Status NewWritableLeveledFile(const std::string& fname,
+                                 std::unique_ptr<WritableFile>* result,
+                                 const EnvOptions& options,
+				 int level) {
+    if (level < 0 && writable_file_leveled) {
+      return NewWritableFile (fname, result, options);
+    } else {
+      return Status::NotSupported();
+    }
+  }
+
 
   // Create an object that writes to a new file with the specified
   // name.  Deletes any existing file with the same name and creates a
@@ -1572,6 +1589,9 @@ Env* NewMemEnv(Env* base_env);
 // Returns a new environment that is used for HDFS environment.
 // This is a factory method for HdfsEnv declared in hdfs/env_hdfs.h
 Status NewHdfsEnv(Env** hdfs_env, const std::string& fsname);
+
+// Returns a new environment that stores its data in ZNS devices
+Status NewZNSEnv(Env** zns_env, const std::string& dev_name);
 
 // Returns a new environment that measures function call times for filesystem
 // operations, reporting results to variables in PerfContext.

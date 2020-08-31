@@ -23,6 +23,12 @@ extern IOStatus NewWritableFile(FileSystem* fs, const std::string& fname,
                                 std::unique_ptr<FSWritableFile>* result,
                                 const FileOptions& options);
 
+// Same as NewWritableFile, but includes the level
+extern IOStatus NewWritableLeveledFile(Env *env,
+			      const std::string& fname,
+                              std::unique_ptr<FSWritableFile>* result,
+                              const FileOptions& options, int level);
+
 // Read a single line from a file.
 bool ReadOneLine(std::istringstream* iss, FSSequentialFile* seq_file,
                  std::string* output, bool* has_data, Status* result);

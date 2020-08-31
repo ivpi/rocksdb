@@ -1457,7 +1457,13 @@ Status CompactionJob::OpenCompactionOutputFile(
   TEST_SYNC_POINT_CALLBACK("CompactionJob::OpenCompactionOutputFile",
                            &syncpoint_arg);
 #endif
-  Status s = NewWritableFile(fs_, fname, &writable_file, file_options_);
+
+  Status s;
+  s = (env_->writable_file_leveled) ?
+      NewWritableLeveledFile(env_, fname, &writable_file, file_options_,
+			     sub_compact->compaction->output_level()) :
+      NewWritableFile(fs_, fname, &writable_file, file_options_);
+
   if (!s.ok()) {
     ROCKS_LOG_ERROR(
         db_options_.info_log,

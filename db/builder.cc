@@ -121,7 +121,11 @@ Status BuildTable(
       bool use_direct_writes = file_options.use_direct_writes;
       TEST_SYNC_POINT_CALLBACK("BuildTable:create_file", &use_direct_writes);
 #endif  // !NDEBUG
-      s = NewWritableFile(fs, fname, &file, file_options);
+
+      s = (env->writable_file_leveled) ?
+	  NewWritableLeveledFile(env, fname, &file, file_options, level) :
+	  NewWritableFile(fs, fname, &file, file_options);
+
       if (!s.ok()) {
         EventHelpers::LogAndNotifyTableFileCreationFinished(
             event_logger, ioptions.listeners, dbname, column_family_name, fname,
