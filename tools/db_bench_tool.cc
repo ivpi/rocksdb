@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <string.h>
 #include <atomic>
 #include <cinttypes>
 #include <condition_variable>
@@ -41,6 +43,7 @@
 #include "rocksdb/cache.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
+#include "env/env_zns.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/memtablerep.h"
 #include "rocksdb/options.h"
@@ -902,6 +905,9 @@ DEFINE_string(env_uri, "", "URI for registry Env lookup. Mutually exclusive"
 #endif  // ROCKSDB_LITE
 DEFINE_string(hdfs, "", "Name of hdfs environment. Mutually exclusive with"
               " --env_uri.");
+
+DEFINE_string(zns, "", "Name of ZNS device. Mutually exclusive with"
+	      " --env_uri and hdfs.");
 
 static std::shared_ptr<rocksdb::Env> env_guard;
 
@@ -2557,13 +2563,48 @@ class Benchmark {
     listener_.reset(new ErrorHandlerListener());
   }
 
+  void test_statistics (void) {
+    size_t flush_w, compact_w, total_w;
+    FILE *fp;
+
+    if (FLAGS_statistics) {
+      flush_w = dbstats->getTickerCount(FLUSH_WRITE_BYTES);
+      compact_w = dbstats->getTickerCount(COMPACT_WRITE_BYTES);
+      total_w = flush_w + compact_w;
+
+      fprintf(stdout, "RocksDB Flush SST Writes      : %.2f MB (%lu bytes)\n",
+				    flush_w / (double) 1048576, flush_w);
+      fprintf(stdout, "RocksDB SST Compaction Writes : %.2f MB (%lu bytes)\n",
+				    compact_w / (double) 1048576, compact_w);
+      fprintf(stdout, "RocksDB Total SST Writes      : %.2f MB (%lu bytes)\n",
+				    total_w / (double) 1048576, total_w);
+
+      fp = fopen("/tmp/rocksdb_written_bytes", "w+");
+      if (fp) {
+	  fprintf(fp, "%lu", total_w);
+	  fclose(fp);
+      }
+      fp = fopen("/tmp/rocksdb_user_bytes", "w+");
+      if (fp) {
+	  fprintf(fp, "%lu", dbstats->getTickerCount(BYTES_WRITTEN));
+	  fclose(fp);
+      }
+
+    }
+  }
+
   ~Benchmark() {
+    test_statistics();
+
     db_.DeleteDBs();
     delete prefix_extractor_;
     if (cache_.get() != nullptr) {
       // this will leak, but we're shutting down so nobody cares
       cache_->DisownData();
     }
+
+    if (!FLAGS_zns.empty())
+      delete FLAGS_env;
   }
 
   Slice AllocateKey(std::unique_ptr<const char[]>* key_guard) {
@@ -6817,6 +6858,8 @@ int db_bench_tool(int argc, char** argv) {
 
   if (!FLAGS_hdfs.empty()) {
     FLAGS_env  = new rocksdb::HdfsEnv(FLAGS_hdfs);
+  } else if (!FLAGS_zns.empty()) {
+    FLAGS_env  = new rocksdb::ZNSEnv(FLAGS_zns);
   }
 
   if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "NONE"))
